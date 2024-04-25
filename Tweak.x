@@ -1,35 +1,35 @@
 #import <version.h>
 #import <rootless.h>
 #import "Header.h"
-#import "../YouTubeHeader/ASCollectionView.h"
-#import "../YouTubeHeader/ELMCellNode.h"
-#import "../YouTubeHeader/ELMContainerNode.h"
-#import "../YouTubeHeader/GIMBindingBuilder.h"
-#import "../YouTubeHeader/GPBExtensionRegistry.h"
-#import "../YouTubeHeader/MLDefaultPlayerViewFactory.h"
-#import "../YouTubeHeader/MLPIPController.h"
-#import "../YouTubeHeader/QTMIcon.h"
-#import "../YouTubeHeader/YTBackgroundabilityPolicy.h"
-#import "../YouTubeHeader/YTColor.h"
-#import "../YouTubeHeader/YTColorPalette.h"
-#import "../YouTubeHeader/YTCommonColorPalette.h"
-#import "../YouTubeHeader/YTHotConfig.h"
-#import "../YouTubeHeader/YTIPictureInPictureRendererRoot.h"
-#import "../YouTubeHeader/YTISlimMetadataButtonSupportedRenderers.h"
-#import "../YouTubeHeader/YTLocalPlaybackController.h"
-#import "../YouTubeHeader/YTMainAppControlsOverlayView.h"
-#import "../YouTubeHeader/YTMainAppVideoPlayerOverlayViewController.h"
-#import "../YouTubeHeader/YTPageStyleController.h"
-#import "../YouTubeHeader/YTPlaybackStrippedWatchController.h"
-#import "../YouTubeHeader/YTPlayerPIPController.h"
-#import "../YouTubeHeader/YTPlayerStatus.h"
-#import "../YouTubeHeader/YTSettingsSectionItem.h"
-#import "../YouTubeHeader/YTSettingsSectionItemManager.h"
-#import "../YouTubeHeader/YTSlimVideoDetailsActionView.h"
-#import "../YouTubeHeader/YTSlimVideoScrollableActionBarCellController.h"
-#import "../YouTubeHeader/YTSlimVideoScrollableDetailsActionsView.h"
-#import "../YouTubeHeader/YTTouchFeedbackController.h"
-#import "../YouTubeHeader/YTWatchViewController.h"
+#import <YouTubeHeader/ASCollectionView.h>
+#import <YouTubeHeader/ELMCellNode.h>
+#import <YouTubeHeader/ELMContainerNode.h>
+#import <YouTubeHeader/GIMBindingBuilder.h>
+#import <YouTubeHeader/GPBExtensionRegistry.h>
+#import <YouTubeHeader/MLDefaultPlayerViewFactory.h>
+#import <YouTubeHeader/MLPIPController.h>
+#import <YouTubeHeader/QTMIcon.h>
+#import <YouTubeHeader/YTBackgroundabilityPolicy.h>
+#import <YouTubeHeader/YTColor.h>
+#import <YouTubeHeader/YTColorPalette.h>
+#import <YouTubeHeader/YTCommonColorPalette.h>
+#import <YouTubeHeader/YTHotConfig.h>
+#import <YouTubeHeader/YTIPictureInPictureRendererRoot.h>
+#import <YouTubeHeader/YTISlimMetadataButtonSupportedRenderers.h>
+#import <YouTubeHeader/YTLocalPlaybackController.h>
+#import <YouTubeHeader/YTMainAppControlsOverlayView.h>
+#import <YouTubeHeader/YTMainAppVideoPlayerOverlayViewController.h>
+#import <YouTubeHeader/YTPageStyleController.h>
+#import <YouTubeHeader/YTPlaybackStrippedWatchController.h>
+#import <YouTubeHeader/YTPlayerPIPController.h>
+#import <YouTubeHeader/YTPlayerStatus.h>
+#import <YouTubeHeader/YTSettingsSectionItem.h>
+#import <YouTubeHeader/YTSettingsSectionItemManager.h>
+#import <YouTubeHeader/YTSlimVideoDetailsActionView.h>
+#import <YouTubeHeader/YTSlimVideoScrollableActionBarCellController.h>
+#import <YouTubeHeader/YTSlimVideoScrollableDetailsActionsView.h>
+#import <YouTubeHeader/YTTouchFeedbackController.h>
+#import <YouTubeHeader/YTWatchViewController.h>
 
 #define PiPButtonType 801
 
@@ -271,12 +271,8 @@ static UIButton *makeUnderNewPlayerButton(ELMCellNode *node, NSString *title, NS
 %property (retain, nonatomic) UIButton *pipButton;
 %property (retain, nonatomic) YTTouchFeedbackController *pipTouchController;
 
-- (BOOL)touchesShouldCancelInContentView:(id)arg1 {
-    return YES; // Ensure we can scroll
-}
-
 - (ELMCellNode *)nodeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqual:@"id.video.scrollable_action_bar"] && !self.pipButton) {
+    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && !self.pipButton) {
         self.contentInset = UIEdgeInsetsMake(0, 0, 0, 73);
         ELMCellNode *node = %orig;
         if (CGRectGetMaxX([node.layoutAttributes frame]) == [self contentSize].width) {
@@ -293,7 +289,7 @@ static UIButton *makeUnderNewPlayerButton(ELMCellNode *node, NSString *title, NS
 }
 
 - (void)nodesDidRelayout:(NSArray <ELMCellNode *> *)nodes {
-    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqual:@"id.video.scrollable_action_bar"] && [nodes count] == 1) {
+    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && [nodes count] == 1) {
         CGFloat offset = nodes[0].calculatedSize.width - [nodes[0].layoutAttributes frame].size.width;
         [UIView animateWithDuration:0.3 animations:^{
             self.pipButton.center = CGPointMake(self.pipButton.center.x + offset, self.pipButton.center.y);
@@ -318,6 +314,12 @@ static UIButton *makeUnderNewPlayerButton(ELMCellNode *node, NSString *title, NS
         FromUser = YES;
         bootstrapPiP(playerViewController, YES);
     }
+}
+
+- (void)dealloc {
+    self.pipButton = nil;
+    self.pipTouchController = nil;
+    %orig;
 }
 
 %end
@@ -403,8 +405,8 @@ static NSMutableArray *topControls(YTMainAppControlsOverlayView *self, NSMutable
 
 %new(v@:@)
 - (void)didPressPiP:(id)arg {
-    YTPlayerViewController *pvc = (YTPlayerViewController *)c.parentViewController;
     YTMainAppVideoPlayerOverlayViewController *c = [self valueForKey:@"_eventsDelegate"];
+    YTPlayerViewController *pvc = (YTPlayerViewController *)c.parentViewController;
     FromUser = YES;
     bootstrapPiP(pvc, YES);
 }
@@ -678,7 +680,7 @@ static YTHotConfig *getHotConfig(YTPlayerPIPController *self) {
 NSBundle *YouPiPBundle() {
     static NSBundle *bundle = nil;
     static dispatch_once_t onceToken;
-	dispatch_once(&onceToken, ^{
+    dispatch_once(&onceToken, ^{
         NSString *tweakBundlePath = [[NSBundle mainBundle] pathForResource:@"YouPiP" ofType:@"bundle"];
         if (tweakBundlePath)
             bundle = [NSBundle bundleWithPath:tweakBundlePath];
