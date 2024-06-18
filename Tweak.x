@@ -4,8 +4,6 @@
 #import <YouTubeHeader/ASCollectionView.h>
 #import <YouTubeHeader/ELMCellNode.h>
 #import <YouTubeHeader/ELMContainerNode.h>
-#import <YouTubeHeader/GIMBindingBuilder.h>
-#import <YouTubeHeader/GPBExtensionRegistry.h>
 #import <YouTubeHeader/MLDefaultPlayerViewFactory.h>
 #import <YouTubeHeader/MLPIPController.h>
 #import <YouTubeHeader/QTMIcon.h>
@@ -13,8 +11,6 @@
 #import <YouTubeHeader/YTColor.h>
 #import <YouTubeHeader/YTColorPalette.h>
 #import <YouTubeHeader/YTCommonColorPalette.h>
-#import <YouTubeHeader/YTHotConfig.h>
-#import <YouTubeHeader/YTIPictureInPictureRendererRoot.h>
 #import <YouTubeHeader/YTISlimMetadataButtonSupportedRenderers.h>
 #import <YouTubeHeader/YTLocalPlaybackController.h>
 #import <YouTubeHeader/YTMainAppControlsOverlayView.h>
@@ -49,7 +45,6 @@ BOOL FromUser = NO;
 BOOL PiPDisabled = NO;
 
 extern BOOL LegacyPiP();
-extern YTHotConfig *(*InjectYTHotConfig)(void);
 
 BOOL TweakEnabled() {
     return [[NSUserDefaults standardUserDefaults] boolForKey:EnabledKey];
@@ -81,17 +76,6 @@ BOOL isPictureInPictureActive(MLPIPController *pip) {
 
 static NSString *PiPIconPath;
 static NSString *TabBarPiPIconPath;
-static NSString *PiPVideoPath;
-
-static void forcePictureInPicture(YTHotConfig *hotConfig, BOOL value) {
-    [hotConfig mediaHotConfig].enablePictureInPicture = value;
-    YTIIosMediaHotConfig *iosMediaHotConfig = hotConfig.hotConfigGroup.mediaHotConfig.iosMediaHotConfig;
-    iosMediaHotConfig.enablePictureInPicture = value;
-    if ([iosMediaHotConfig respondsToSelector:@selector(setEnablePipForNonBackgroundableContent:)])
-        iosMediaHotConfig.enablePipForNonBackgroundableContent = value && NonBackgroundable();
-    if ([iosMediaHotConfig respondsToSelector:@selector(setEnablePipForNonPremiumUsers:)])
-        iosMediaHotConfig.enablePipForNonPremiumUsers = value;
-}
 
 static void activatePiPBase(YTPlayerPIPController *controller, BOOL playPiP) {
     MLPIPController *pip = [controller valueForKey:@"_pipController"];
@@ -130,16 +114,6 @@ static void activatePiP(YTLocalPlaybackController *local, BOOL playPiP) {
 }
 
 static void bootstrapPiP(YTPlayerViewController *self, BOOL playPiP) {
-    YTHotConfig *hotConfig;
-    @try {
-        if (InjectYTHotConfig)
-            hotConfig = InjectYTHotConfig();
-        else
-            hotConfig = [self valueForKey:@"_hotConfig"];
-    } @catch (id ex) {
-        hotConfig = [[self gimme] instanceForType:%c(YTHotConfig)];
-    }
-    forcePictureInPicture(hotConfig, YES);
     YTLocalPlaybackController *local = [self valueForKey:@"_playbackController"];
     activatePiP(local, playPiP);
 }
@@ -272,9 +246,9 @@ static UIButton *makeUnderNewPlayerButton(ELMCellNode *node, NSString *title, NS
 %property (retain, nonatomic) YTTouchFeedbackController *pipTouchController;
 
 - (ELMCellNode *)nodeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && !self.pipButton) {
+    ELMCellNode *node = %orig;
+    if ([self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && UseTabBarPiPButton() && !self.pipButton) {
         self.contentInset = UIEdgeInsetsMake(0, 0, 0, 73);
-        ELMCellNode *node = %orig;
         if (CGRectGetMaxX([node.layoutAttributes frame]) == [self contentSize].width) {
             self.pipButton = makeUnderNewPlayerButton(node, @"PiP", @"Play in PiP");
             [self addSubview:self.pipButton];
@@ -289,7 +263,7 @@ static UIButton *makeUnderNewPlayerButton(ELMCellNode *node, NSString *title, NS
 }
 
 - (void)nodesDidRelayout:(NSArray <ELMCellNode *> *)nodes {
-    if (UseTabBarPiPButton() && [self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && [nodes count] == 1) {
+    if ([self.accessibilityIdentifier isEqualToString:@"id.video.scrollable_action_bar"] && UseTabBarPiPButton() && [nodes count] == 1) {
         CGFloat offset = nodes[0].calculatedSize.width - [nodes[0].layoutAttributes frame].size.width;
         [UIView animateWithDuration:0.3 animations:^{
             self.pipButton.center = CGPointMake(self.pipButton.center.x + offset, self.pipButton.center.y);
@@ -497,11 +471,21 @@ static NSMutableArray *topControls(YTMainAppControlsOverlayView *self, NSMutable
 
 %end
 
-%hook MLDefaultPlayerViewFactory
+%hook YTIIosMediaHotConfig
 
-- (MLAVPlayerLayerView *)AVPlayerViewForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig {
-    forcePictureInPicture([self valueForKey:@"_hotConfig"], YES);
-    return %orig;
+%new(B@:)
+- (BOOL)enablePictureInPicture {
+    return YES;
+}
+
+%new(B@:)
+- (BOOL)enablePipForNonBackgroundableContent {
+    return NonBackgroundable();
+}
+
+%new(B@:)
+- (BOOL)enablePipForNonPremiumUsers {
+    return YES;
 }
 
 %end
@@ -533,20 +517,6 @@ static NSMutableArray *topControls(YTMainAppControlsOverlayView *self, NSMutable
 
 %end
 
-%hook YTSettingsSectionItemManager
-
-- (YTSettingsSectionItem *)pictureInPictureSectionItem {
-    forcePictureInPicture([self valueForKey:@"_hotConfig"], YES);
-    return %orig;
-}
-
-- (YTSettingsSectionItem *)pictureInPictureSectionItem:(id)arg1 {
-    forcePictureInPicture([self valueForKey:@"_hotConfig"], YES);
-    return %orig;
-}
-
-%end
-
 #pragma mark - Hacks
 
 BOOL YTSingleVideo_isLivePlayback_override = NO;
@@ -559,18 +529,9 @@ BOOL YTSingleVideo_isLivePlayback_override = NO;
 
 %end
 
-static YTHotConfig *getHotConfig(YTPlayerPIPController *self) {
-    @try {
-        return [self valueForKey:@"_hotConfig"];
-    } @catch (id ex) {
-        return [[self valueForKey:@"_config"] valueForKey:@"_hotConfig"];
-    }
-}
-
 %hook YTPlayerPIPController
 
 - (BOOL)canInvokePictureInPicture {
-    forcePictureInPicture(getHotConfig(self), YES);
     YTSingleVideo_isLivePlayback_override = YES;
     BOOL value = %orig;
     YTSingleVideo_isLivePlayback_override = NO;
@@ -578,7 +539,6 @@ static YTHotConfig *getHotConfig(YTPlayerPIPController *self) {
 }
 
 - (BOOL)canEnablePictureInPicture {
-    forcePictureInPicture(getHotConfig(self), YES);
     YTSingleVideo_isLivePlayback_override = YES;
     BOOL value = %orig;
     YTSingleVideo_isLivePlayback_override = NO;
@@ -639,44 +599,6 @@ static YTHotConfig *getHotConfig(YTPlayerPIPController *self) {
 
 %end
 
-#pragma mark - PiP Support, Binding
-
-%hook YTAppModule
-
-- (void)configureWithBinder:(GIMBindingBuilder *)binder {
-    %orig;
-    [[binder bindType:%c(MLPIPController)] initializedWith:^(id a) {
-        MLPIPController *pip = [%c(MLPIPController) alloc];
-        if ([pip respondsToSelector:@selector(initWithPlaceholderPlayerItemResourcePath:)])
-            pip = [pip initWithPlaceholderPlayerItemResourcePath:PiPVideoPath];
-        else if ([pip respondsToSelector:@selector(initWithPlaceholderPlayerItem:)])
-            pip = [pip initWithPlaceholderPlayerItem:[AVPlayerItem playerItemWithURL:[NSURL URLWithString:PiPVideoPath]]];
-        return pip;
-    }];
-}
-
-%end
-
-%hook YTIInnertubeResourcesIosRoot
-
-- (GPBExtensionRegistry *)extensionRegistry {
-    GPBExtensionRegistry *registry = %orig;
-    [registry addExtension:[%c(YTIPictureInPictureRendererRoot) pictureInPictureRenderer]];
-    return registry;
-}
-
-%end
-
-%hook GoogleGlobalExtensionRegistry
-
-- (GPBExtensionRegistry *)extensionRegistry {
-    GPBExtensionRegistry *registry = %orig;
-    [registry addExtension:[%c(YTIPictureInPictureRendererRoot) pictureInPictureRenderer]];
-    return registry;
-}
-
-%end
-
 NSBundle *YouPiPBundle() {
     static NSBundle *bundle = nil;
     static dispatch_once_t onceToken;
@@ -693,7 +615,6 @@ NSBundle *YouPiPBundle() {
 %ctor {
     if (!TweakEnabled()) return;
     NSBundle *tweakBundle = YouPiPBundle();
-    PiPVideoPath = [tweakBundle pathForResource:@"PiPPlaceholderAsset" ofType:@"mp4"];
     PiPIconPath = [tweakBundle pathForResource:@"yt-pip-overlay" ofType:@"png"];
     TabBarPiPIconPath = [tweakBundle pathForResource:@"yt-pip-tabbar" ofType:@"png"];
     %init;
