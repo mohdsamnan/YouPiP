@@ -9,7 +9,7 @@
 
 #define LOC(x) [tweakBundle localizedStringForKey:x value:nil table:nil]
 
-#define FEATURE_CUTOFF_VERSION @"17.38.10"
+#define FEATURE_CUTOFF_VERSION @"19.20.2"
 
 static const NSInteger YouPiPSection = 200;
 
