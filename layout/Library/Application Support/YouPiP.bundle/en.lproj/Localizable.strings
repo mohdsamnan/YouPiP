@@ -19,7 +19,7 @@
 "NON_BACKGROUNDABLE_PIP_DESC" = "Enables PiP for non-backgroundable video.";
 
 "FAKE_YT_VERSION" = "Fake YouTube version";
-"FAKE_YT_VERSION_DESC" = "Set YouTube version to %@ so that video player works with LowContrastMode.";
+"FAKE_YT_VERSION_DESC" = "Set YouTube version to %@ so that video player won't have memory leak problems when spoofing to an old version of YouTube.";
 
 // Compatibility warning
 "UNSUPPORTED_YT_VERSION" = "YouTube version %@ is not tested and may not be supported by YouPiP, please upgrade YouTube to at least version %@";
