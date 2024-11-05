@@ -1,0 +1,25 @@
+// Settings
+
+"ENABLED" = "Diaktifkan";
+"ENABLED_DESC" = "Mulai ulang aplikasi diperlukan.";
+
+"USE_PIP_BUTTON" = "Gunakan tombol PiP";
+"USE_PIP_BUTTON_DESC" = "Menambahkan tombol PiP di atas overlay kontrol video untuk mengaktifkan PiP alih-alih menutup aplikasi.";
+
+"USE_TAB_BAR_PIP_BUTTON" = "Gunakan tombol PiP di bilah tab video";
+"USE_TAB_BAR_PIP_BUTTON_DESC" = "Menambahkan tombol PiP di bilah tab video untuk mengaktifkan PiP alih-alih menutup aplikasi. Mulai ulang aplikasi diperlukan.";
+
+"DISABLE_PIP_MINI_PLAYER" = "Nonaktifkan PiP untuk pemutar mini";
+"DISABLE_PIP_MINI_PLAYER_DESC" = "Menonaktifkan PiP saat memutar video di pemutar mini.";
+
+"LEGACY_PIP" = "PiP Legacy";
+"LEGACY_PIP_DESC" = "Menggunakan avplayerlayer untuk PiP. Ini memperbaiki bug percepatan tetapi mungkin menghapus opsi UHD (2k/4k) dari video apa pun. Mulai ulang aplikasi diperlukan.";
+
+"NON_BACKGROUNDABLE_PIP" = "Pip non-latar belakang";
+"NON_BACKGROUNDABLE_PIP_DESC" = "Mengaktifkan PiP untuk video yang tidak dapat berjalan di latar belakang.";
+
+"FAKE_YT_VERSION" = "Palsukan versi YouTube";
+"FAKE_YT_VERSION_DESC" = "Mengatur versi YouTube ke %@ agar pemutar video tidak memiliki masalah kebocoran memori saat menyamarkan ke versi YouTube yang lebih lama.";
+
+// Compatibility warning
+"UNSUPPORTED_YT_VERSION" = "Versi YouTube %@ tidak diuji dan mungkin tidak didukung oleh YouPiP, silakan tingkatkan YouTube ke setidaknya versi %@";
