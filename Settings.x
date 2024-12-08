@@ -33,13 +33,15 @@ static NSString *YouPiPWarnVersionKey = @"YouPiPWarnVersionKey";
 
 %hook YTAppSettingsPresentationData
 
-+ (NSArray *)settingsCategoryOrder {
-    NSArray *order = %orig;
-    NSMutableArray *mutableOrder = [order mutableCopy];
++ (NSArray <NSNumber *> *)settingsCategoryOrder {
+    NSArray <NSNumber *> *order = %orig;
     NSUInteger insertIndex = [order indexOfObject:@(1)];
-    if (insertIndex != NSNotFound)
-        [mutableOrder insertObject:@(YouPiPSection) atIndex:insertIndex + 1]; // Add YouPiP under General (ID: 1) section
-    return mutableOrder;
+    if (insertIndex != NSNotFound) {
+        NSMutableArray <NSNumber *> *mutableOrder = order.mutableCopy;
+        [mutableOrder insertObject:@(YouPiPSection) atIndex:insertIndex + 1];
+        order = mutableOrder.copy;
+    }
+    return order;
 }
 
 %end
