@@ -1,15 +1,15 @@
 #import <version.h>
 #import "Header.h"
-#import <YouTubeHeader/YTAlertView.h>
+#import <YouTubeHeader/YTAppSettingsSectionItemActionController.h>
 #import <YouTubeHeader/YTHotConfig.h>
-#import <YouTubeHeader/YTSettingsViewController.h>
+#import <YouTubeHeader/YTSettingsGroupData.h>
 #import <YouTubeHeader/YTSettingsSectionItem.h>
 #import <YouTubeHeader/YTSettingsSectionItemManager.h>
-#import <YouTubeHeader/YTAppSettingsSectionItemActionController.h>
+#import <YouTubeHeader/YTSettingsViewController.h>
 
 #define LOC(x) [tweakBundle localizedStringForKey:x value:nil table:nil]
 
-#define FEATURE_CUTOFF_VERSION @"19.20.2"
+#define FEATURE_CUTOFF_VERSION @"18.35.4"
 
 static const NSInteger YouPiPSection = 200;
 
@@ -29,8 +29,6 @@ extern NSBundle *YouPiPBundle();
 
 NSString *currentVersion;
 
-static NSString *YouPiPWarnVersionKey = @"YouPiPWarnVersionKey";
-
 %hook YTAppSettingsPresentationData
 
 + (NSArray <NSNumber *> *)settingsCategoryOrder {
@@ -42,6 +40,18 @@ static NSString *YouPiPWarnVersionKey = @"YouPiPWarnVersionKey";
         order = mutableOrder.copy;
     }
     return order;
+}
+
+%end
+
+%hook YTSettingsGroupData
+
+- (NSArray <NSNumber *> *)orderedCategories {
+    if (self.type != 1 || class_getClassMethod(objc_getClass("YTSettingsGroupData"), @selector(tweaks)))
+        return %orig;
+    NSMutableArray *mutableCategories = %orig.mutableCopy;
+    [mutableCategories insertObject:@(YouPiPSection) atIndex:0];
+    return mutableCategories.copy;
 }
 
 %end
@@ -140,10 +150,10 @@ static NSString *YouPiPWarnVersionKey = @"YouPiPWarnVersionKey";
     }
     if ([delegate respondsToSelector:@selector(setSectionItems:forCategory:title:icon:titleDescription:headerHidden:)]) {
         YTIIcon *icon = [%c(YTIIcon) new];
-        icon.iconType = YT_PIP;
-        [delegate setSectionItems:sectionItems forCategory:YouPiPSection title:TweakName icon:icon titleDescription:nil headerHidden:NO];
+        icon.iconType = YT_PICTURE_IN_PICTURE;
+        [delegate setSectionItems:sectionItems forCategory:YouPiPSection title:LOC(@"SETTINGS_TITLE") icon:icon titleDescription:nil headerHidden:NO];
     } else
-        [delegate setSectionItems:sectionItems forCategory:YouPiPSection title:TweakName titleDescription:nil headerHidden:NO];
+        [delegate setSectionItems:sectionItems forCategory:YouPiPSection title:LOC(@"SETTINGS_TITLE") titleDescription:nil headerHidden:NO];
 }
 
 - (void)updateSectionForCategory:(NSUInteger)category withEntry:(id)entry {
