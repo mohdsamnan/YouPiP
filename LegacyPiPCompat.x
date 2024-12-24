@@ -1,19 +1,19 @@
 #import "Header.h"
 #import <version.h>
 #import <YouTubeHeader/MLAVPlayer.h>
+#import <YouTubeHeader/MLDefaultPlayerViewFactory.h>
 #import <YouTubeHeader/MLHAMQueuePlayer.h>
 #import <YouTubeHeader/MLPIPController.h>
 #import <YouTubeHeader/MLPlayerPool.h>
 #import <YouTubeHeader/MLPlayerPoolImpl.h>
 #import <YouTubeHeader/MLVideoDecoderFactory.h>
-#import <YouTubeHeader/MLDefaultPlayerViewFactory.h>
-#import <YouTubeHeader/YTHotConfig.h>
-#import <YouTubeHeader/YTPlayerPIPController.h>
+#import <YouTubeHeader/YTAutonavEndscreenController.h>
 #import <YouTubeHeader/YTBackgroundabilityPolicy.h>
+#import <YouTubeHeader/YTHotConfig.h>
+#import <YouTubeHeader/YTLiveWatchPlaybackOverlayView.h>
+#import <YouTubeHeader/YTPlayerPIPController.h>
 #import <YouTubeHeader/YTPlayerViewControllerConfig.h>
 #import <YouTubeHeader/YTSystemNotifications.h>
-#import <YouTubeHeader/YTAutonavEndscreenController.h>
-#import <YouTubeHeader/YTLiveWatchPlaybackOverlayView.h>
 
 extern BOOL TweakEnabled();
 extern BOOL isPictureInPictureActive(MLPIPController *);
@@ -382,21 +382,28 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
     if (!TweakEnabled()) return;
     NSString *bundlePath = [NSString stringWithFormat:@"%@/Frameworks/Module_Framework.framework", NSBundle.mainBundle.bundlePath];
     NSBundle *bundle = [NSBundle bundleWithPath:bundlePath];
+    BOOL isAppOnly = NO;
     if (bundle) {
         [bundle load];
         bundlePath = [bundlePath stringByAppendingString:@"/Module_Framework"];
     }
-    else bundlePath = NSBundle.mainBundle.executablePath;
-    MSImageRef ref = MSGetImageByName([bundlePath UTF8String]);
-    InjectMLPIPController = (MLPIPController *(*)(void))MSFindSymbol(ref, "_InjectMLPIPController");
-    if (InjectMLPIPController) {
-        InjectYTSystemNotifications = (YTSystemNotifications *(*)(void))MSFindSymbol(ref, "_InjectYTSystemNotifications");
-        InjectYTBackgroundabilityPolicy = (YTBackgroundabilityPolicy *(*)(void))MSFindSymbol(ref, "_InjectYTBackgroundabilityPolicy");
-        InjectYTPlayerViewControllerConfig = (YTPlayerViewControllerConfig *(*)(void))MSFindSymbol(ref, "_InjectYTPlayerViewControllerConfig");
-        InjectYTHotConfig = (YTHotConfig *(*)(void))MSFindSymbol(ref, "_InjectYTHotConfig");
-        %init(WithInjection);
+    else {
+        bundlePath = NSBundle.mainBundle.executablePath;
+        isAppOnly = YES;
+    }
+    if (!isAppOnly) {
+        MSImageRef ref = MSGetImageByName([bundlePath UTF8String]);
+        InjectMLPIPController = (MLPIPController *(*)(void))MSFindSymbol(ref, "_InjectMLPIPController");
+        if (InjectMLPIPController) {
+            InjectYTSystemNotifications = (YTSystemNotifications *(*)(void))MSFindSymbol(ref, "_InjectYTSystemNotifications");
+            InjectYTBackgroundabilityPolicy = (YTBackgroundabilityPolicy *(*)(void))MSFindSymbol(ref, "_InjectYTBackgroundabilityPolicy");
+            InjectYTPlayerViewControllerConfig = (YTPlayerViewControllerConfig *(*)(void))MSFindSymbol(ref, "_InjectYTPlayerViewControllerConfig");
+            InjectYTHotConfig = (YTHotConfig *(*)(void))MSFindSymbol(ref, "_InjectYTHotConfig");
+            %init(WithInjection);
+        } else
+            hasSampleBufferPiP = IS_IOS_OR_NEWER(iOS_13_0);
     } else
-        hasSampleBufferPiP = IS_IOS_OR_NEWER(iOS_13_0);
+        hasSampleBufferPiP = YES;
     if (!IS_IOS_OR_NEWER(iOS_14_0)) {
         %init(Compat);
         if (!IS_IOS_OR_NEWER(iOS_13_0))
