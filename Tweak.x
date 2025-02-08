@@ -1,6 +1,5 @@
 #import <version.h>
-#import <rootless.h>
-#import "Header.h"
+#import <PSHeader/Misc.h>
 #import <YouTubeHeader/ASCollectionView.h>
 #import <YouTubeHeader/ELMCellNode.h>
 #import <YouTubeHeader/ELMContainerNode.h>
@@ -10,7 +9,6 @@
 #import <YouTubeHeader/YTAppDelegate.h>
 #import <YouTubeHeader/YTAppViewControllerImpl.h>
 #import <YouTubeHeader/YTBackgroundabilityPolicy.h>
-#import <YouTubeHeader/YTBackgroundabilityPolicyImpl.h>
 #import <YouTubeHeader/YTColor.h>
 #import <YouTubeHeader/YTColorPalette.h>
 #import <YouTubeHeader/YTCommonColorPalette.h>
@@ -26,8 +24,10 @@
 #import <YouTubeHeader/YTSlimVideoDetailsActionView.h>
 #import <YouTubeHeader/YTSlimVideoScrollableActionBarCellController.h>
 #import <YouTubeHeader/YTSlimVideoScrollableDetailsActionsView.h>
+#import <YouTubeHeader/YTSystemNotifications.h>
 #import <YouTubeHeader/YTTouchFeedbackController.h>
 #import <YouTubeHeader/YTWatchViewController.h>
+#import "Header.h"
 #import "../YTVideoOverlay/Header.h"
 #import "../YTVideoOverlay/Init.x"
 
@@ -51,8 +51,7 @@ BOOL PiPDisabled = NO;
 extern BOOL LegacyPiP();
 
 BOOL TweakEnabled() {
-    id value = [[NSUserDefaults standardUserDefaults] objectForKey:EnabledKey];
-    return value ? [value boolValue] : YES;
+    return [[NSUserDefaults standardUserDefaults] boolForKey:EnabledKey];
 }
 
 BOOL UsePiPButton() {
@@ -83,6 +82,8 @@ static NSString *PiPIconPath;
 static NSString *TabBarPiPIconPath;
 
 static void activatePiPBase(YTPlayerPIPController *controller) {
+    YTBackgroundabilityPolicy *backgroundabilityPolicy = [controller valueForKey:@"_backgroundabilityPolicy"];
+    if (!backgroundabilityPolicy.playableInPiPByUserSettings) return;
     MLPIPController *pip = [controller valueForKey:@"_pipController"];
     if ([controller respondsToSelector:@selector(maybeEnablePictureInPicture)])
         [controller maybeEnablePictureInPicture];
@@ -364,39 +365,27 @@ static UIImage *pipImage() {
 
 #pragma mark - PiP Support
 
-%hook AVPictureInPictureController
-
-+ (BOOL)isPictureInPictureSupported {
-    return YES;
-}
-
-%end
-
-%hook AVPlayerController
-
-- (BOOL)isPictureInPictureSupported {
-    return YES;
-}
-
-%end
-
 %hook MLPIPController
 
 - (void)activatePiPController {
     %orig;
+    BOOL blockPiP = !UseAllPiPMethod() && (UsePiPButton() || UseTabBarPiPButton());
+    AVPictureInPictureController *avpip = [self valueForKey:@"_pictureInPictureController"];
+    if (blockPiP && [avpip respondsToSelector:@selector(canStartPictureInPictureAutomaticallyFromInline)])
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+        avpip.canStartPictureInPictureAutomaticallyFromInline = NO;
+    if ([avpip respondsToSelector:@selector(canStartAutomaticallyWhenEnteringBackground)])
+        avpip.canStartAutomaticallyWhenEnteringBackground = !blockPiP;
+#pragma clang diagnostic pop
     if (IS_IOS_OR_NEWER(iOS_15_0) || LegacyPiP()) return;
     MLHAMSBDLSampleBufferRenderingView *view = [self valueForKey:@"_HAMPlayerView"];
     CGSize size = [self renderSizeForView:view];
-    AVPictureInPictureController *avpip = [self valueForKey:@"_pictureInPictureController"];
     [avpip sampleBufferDisplayLayerRenderSizeDidChangeToSize:size];
     [avpip sampleBufferDisplayLayerDidAppear];
 }
 
-- (BOOL)isPictureInPictureSupported {
-    return YES;
-}
-
-%new(c@:@)
+%new(B@:@)
 - (BOOL)pictureInPictureControllerPlaybackPaused:(AVPictureInPictureController *)pictureInPictureController {
     return [self pictureInPictureControllerIsPlaybackPaused:pictureInPictureController];
 }
@@ -436,49 +425,19 @@ static UIImage *pipImage() {
 
 %hook YTIIosMediaHotConfig
 
-%new(c@:)
+%new(B@:)
 - (BOOL)enablePictureInPicture {
     return YES;
 }
 
-%new(c@:)
+%new(B@:)
 - (BOOL)enablePipForNonBackgroundableContent {
     return NonBackgroundable();
 }
 
-%new(c@:)
+%new(B@:)
 - (BOOL)enablePipForNonPremiumUsers {
     return YES;
-}
-
-%end
-
-#pragma mark - PiP Support, Backgroundable
-
-%hook YTBackgroundabilityPolicy
-
-- (void)updateIsBackgroundableByUserSettings {
-    %orig;
-    [self setValue:@(YES) forKey:@"_backgroundableByUserSettings"];
-}
-
-- (void)updateIsPictureInPicturePlayableByUserSettings {
-    %orig;
-    [self setValue:@(YES) forKey:@"_playableInPiPByUserSettings"];
-}
-
-%end
-
-%hook YTBackgroundabilityPolicyImpl
-
-- (void)updateIsBackgroundableByUserSettings {
-    %orig;
-    [self setValue:@(YES) forKey:@"_backgroundableByUserSettings"];
-}
-
-- (void)updateIsPictureInPicturePlayableByUserSettings {
-    %orig;
-    [self setValue:@(YES) forKey:@"_playableInPiPByUserSettings"];
 }
 
 %end
@@ -517,14 +476,12 @@ BOOL YTSingleVideo_isLivePlayback_override = NO;
 }
 
 - (void)appWillResignActive:(id)arg1 {
-    if (UseAllPiPMethod()) {
-        %orig;
-        return;
+    if (!UseAllPiPMethod()) {
+        // If PiP button on, PiP doesn't activate on app resign unless it's from user
+        BOOL hasPiPButton = UsePiPButton() || UseTabBarPiPButton();
+        BOOL disablePiP = hasPiPButton && !FromUser;
+        if (disablePiP) return;
     }
-    // If PiP button on, PiP doesn't activate on app resign unless it's from user
-    BOOL hasPiPButton = UsePiPButton() || UseTabBarPiPButton();
-    BOOL disablePiP = hasPiPButton && !FromUser;
-    if (disablePiP) return;
     if (LegacyPiP())
         activatePiPBase(self);
     %orig;
@@ -561,12 +518,36 @@ BOOL YTSingleVideo_isLivePlayback_override = NO;
 
 %end
 
+#pragma mark - App background event
+
+@protocol YTSystemNotificationsObserverExtended <YTSystemNotificationsObserver>
+- (void)appWillEnterBackground:(UIApplication *)application;
+@end
+
+%hook YTSystemNotifications
+
+- (void)registerForNotifications {
+    %orig;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appWillEnterBackground:) name:UIApplicationDidEnterBackgroundNotification object:nil];
+}
+
+%new(v@:@)
+- (void)appWillEnterBackground:(id)arg {
+    [self callBlockForEveryObserver:^(id <YTSystemNotificationsObserver> observer) {
+        id <YTSystemNotificationsObserverExtended> observerExtended = (id <YTSystemNotificationsObserverExtended>)observer;
+        if ([observerExtended respondsToSelector:@selector(appWillEnterBackground:)])
+            [observerExtended appWillEnterBackground:UIApplication.sharedApplication];
+    }];
+}
+
+%end
+
 NSBundle *YouPiPBundle() {
     static NSBundle *bundle = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSString *tweakBundlePath = [[NSBundle mainBundle] pathForResource:@"YouPiP" ofType:@"bundle"];
-        bundle = [NSBundle bundleWithPath:tweakBundlePath ?: ROOT_PATH_NS(@"/Library/Application Support/" TweakName ".bundle")];
+        bundle = [NSBundle bundleWithPath:tweakBundlePath ?: PS_ROOT_PATH_NS(@"/Library/Application Support/" TweakName ".bundle")];
     });
     return bundle;
 }
@@ -575,6 +556,9 @@ NSBundle *YouPiPBundle() {
     NSBundle *tweakBundle = YouPiPBundle();
     TabBarPiPIconPath = [tweakBundle pathForResource:@"yt-pip-tabbar" ofType:@"png"];
     %init(Icon);
+    [[NSUserDefaults standardUserDefaults] registerDefaults:@{
+        EnabledKey: @YES,
+    }];
     if (!TweakEnabled()) return;
     PiPIconPath = [tweakBundle pathForResource:@"yt-pip-overlay" ofType:@"png"];
     initYTVideoOverlay(TweakName, @{
