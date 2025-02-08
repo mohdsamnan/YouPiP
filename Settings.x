@@ -114,7 +114,7 @@ NSString *currentVersion;
         }
         settingItemId:0];
     [sectionItems addObject:miniPlayer];
-    if (IS_IOS_OR_NEWER(iOS_13_0)) {
+    if (IS_IOS_OR_NEWER(iOS_14_0)) {
         YTSettingsSectionItem *legacyPiP = [%c(YTSettingsSectionItem) switchItemWithTitle:LOC(@"LEGACY_PIP")
             titleDescription:LOC(@"LEGACY_PIP_DESC")
             accessibilityIdentifier:nil
@@ -128,12 +128,7 @@ NSString *currentVersion;
     }
     YTAppSettingsSectionItemActionController *sectionItemActionController = [delegate valueForKey:@"_sectionItemActionController"];
     YTSettingsSectionItemManager *sectionItemManager = [sectionItemActionController valueForKey:@"_sectionItemManager"];
-    YTHotConfig *hotConfig;
-    @try {
-        hotConfig = [sectionItemManager valueForKey:@"_hotConfig"];
-    } @catch (id ex) {
-        hotConfig = [sectionItemManager.gimme instanceForType:%c(YTHotConfig)];
-    }
+    YTHotConfig *hotConfig = [sectionItemManager valueForKey:@"_hotConfig"];
     YTIIosMediaHotConfig *iosMediaHotConfig = hotConfig.hotConfigGroup.mediaHotConfig.iosMediaHotConfig;
     if ([iosMediaHotConfig respondsToSelector:@selector(setEnablePipForNonBackgroundableContent:)]) {
         YTSettingsSectionItem *nonBackgroundable = [%c(YTSettingsSectionItem) switchItemWithTitle:LOC(@"NON_BACKGROUNDABLE_PIP")
