@@ -26,12 +26,12 @@ BOOL LegacyPiP() {
 }
 
 static void forceRenderViewTypeBase(YTIHamplayerConfig *hamplayerConfig) {
-    if (!LegacyPiP()) return;
+    if (!hamplayerConfig || !LegacyPiP()) return;
     hamplayerConfig.renderViewType = 2;
 }
 
 static void forceRenderViewTypeHot(YTIHamplayerHotConfig *hamplayerHotConfig) {
-    if (!LegacyPiP()) return;
+    if (!hamplayerHotConfig || !LegacyPiP()) return;
     hamplayerHotConfig.renderViewType = 2;
 }
 
@@ -180,10 +180,9 @@ YTPlayerPIPController *initPlayerPiPControllerIfNeeded(YTPlayerPIPController *co
 
 %group Legacy
 
-static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig *playerConfig, MLPlayerStickySettings *stickySettings, BOOL gimmeAlloc) {
+static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig *playerConfig, MLPlayerStickySettings *stickySettings) {
     BOOL externalPlaybackActive = [(MLAVPlayer *)[self valueForKey:@"_activePlayer"] externalPlaybackActive];
-    MLAVPlayer *player = gimmeAlloc ? [((MLPlayerPool *)self).gimme allocOf:%c(MLAVPlayer)] : [%c(MLAVPlayer) alloc];
-    player = [player initWithVideo:video playerConfig:playerConfig stickySettings:stickySettings externalPlaybackActive:externalPlaybackActive];
+    MLAVPlayer *player = [[%c(MLAVPlayer) alloc] initWithVideo:video playerConfig:playerConfig stickySettings:stickySettings externalPlaybackActive:externalPlaybackActive];
     if (stickySettings)
         player.rate = stickySettings.rate;
     return player;
@@ -212,19 +211,19 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
 %hook MLPlayerPoolImpl
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, NO);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings latencyLogger:(id)latencyLogger {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, NO);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings latencyLogger:(id)latencyLogger reloadContext:(id)reloadContext {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, NO);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings latencyLogger:(id)latencyLogger reloadContext:(id)reloadContext mediaPlayerResources:(id)mediaPlayerResources {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, NO);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (MLAVPlayerLayerView *)playerViewForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig {
@@ -250,11 +249,11 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
 %hook MLPlayerPool
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, YES);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (id)acquirePlayerForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig stickySettings:(MLPlayerStickySettings *)stickySettings latencyLogger:(id)latencyLogger {
-    return makeAVPlayer(self, video, playerConfig, stickySettings, YES);
+    return makeAVPlayer(self, video, playerConfig, stickySettings);
 }
 
 - (MLAVPlayerLayerView *)playerViewForVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig {
@@ -281,7 +280,18 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
     return %orig;
 }
 
+- (id)hamPlayerViewForPlayerConfig:(MLInnerTubePlayerConfig *)playerConfig {
+    forceRenderViewType([self valueForKey:@"_hotConfig"]);
+    forceRenderViewTypeBase([playerConfig hamplayerConfig]);
+    return %orig;
+}
+
 - (BOOL)canUsePlayerView:(id)playerView forVideo:(MLVideo *)video playerConfig:(MLInnerTubePlayerConfig *)playerConfig {
+    forceRenderViewTypeBase([playerConfig hamplayerConfig]);
+    return %orig;
+}
+
+- (BOOL)canUsePlayerView:(id)playerView forPlayerConfig:(MLInnerTubePlayerConfig *)playerConfig {
     forceRenderViewTypeBase([playerConfig hamplayerConfig]);
     return %orig;
 }
@@ -320,7 +330,7 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
 %new(v@:{CGSize=dd})
 - (void)sampleBufferDisplayLayerRenderSizeDidChangeToSize:(CGSize)size {}
 
-%new(v@:c)
+%new(v@:B)
 - (void)setRequiresLinearPlayback:(BOOL)linear {}
 
 %new(v@:)
@@ -365,7 +375,7 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
 
 %hook AVPictureInPictureController
 
-%new(v@:c)
+%new(v@:B)
 - (void)setCanStartPictureInPictureAutomaticallyFromInline:(BOOL)canStartFromInline {}
 
 %end
@@ -378,16 +388,9 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
     if (!TweakEnabled()) return;
     NSString *bundlePath = [NSString stringWithFormat:@"%@/Frameworks/Module_Framework.framework", NSBundle.mainBundle.bundlePath];
     NSBundle *bundle = [NSBundle bundleWithPath:bundlePath];
-    BOOL isAppOnly = NO;
     if (bundle) {
         [bundle load];
         bundlePath = [bundlePath stringByAppendingString:@"/Module_Framework"];
-    }
-    else {
-        bundlePath = NSBundle.mainBundle.executablePath;
-        isAppOnly = YES;
-    }
-    if (!isAppOnly) {
         MSImageRef ref = MSGetImageByName([bundlePath UTF8String]);
         InjectMLPIPController = (MLPIPController *(*)(void))MSFindSymbol(ref, "_InjectMLPIPController");
         if (InjectMLPIPController) {
@@ -397,13 +400,12 @@ static MLAVPlayer *makeAVPlayer(id self, MLVideo *video, MLInnerTubePlayerConfig
             InjectYTHotConfig = (YTHotConfig *(*)(void))MSFindSymbol(ref, "_InjectYTHotConfig");
             %init(WithInjection);
         } else
-            hasSampleBufferPiP = IS_IOS_OR_NEWER(iOS_13_0);
+            hasSampleBufferPiP = IS_IOS_OR_NEWER(iOS_14_0);
     } else
         hasSampleBufferPiP = YES;
     if (!IS_IOS_OR_NEWER(iOS_14_0)) {
         %init(Compat);
-        if (!IS_IOS_OR_NEWER(iOS_13_0))
-            isLegacyVersion = YES;
+        isLegacyVersion = YES;
     }
     if (LegacyPiP()) {
         %init(Legacy);
