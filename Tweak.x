@@ -552,19 +552,43 @@ NSBundle *YouPiPBundle() {
     return bundle;
 }
 
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+// Define missing keys
+static NSString *const EnabledKey = @"Enabled";
+static NSString *const AccessibilityLabelKey = @"AccessibilityLabel";
+static NSString *const SelectorKey = @"Selector";
+static NSString *const ToggleKey = @"Toggle";
+static NSString *const PiPActivationMethodKey = @"PiPActivationMethod";
+
+// Define missing functions
+static BOOL TweakEnabled() {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:EnabledKey];
+}
+
+static NSBundle *YouPiPBundle() {
+    return [NSBundle bundleWithPath:@"/Library/Application Support/YouPiP"];
+}
+
 %ctor {
     NSBundle *tweakBundle = YouPiPBundle();
     TabBarPiPIconPath = [tweakBundle pathForResource:@"yt-pip-tabbar" ofType:@"png"];
-    %init(Icon);
+
+    %init(Icon);  // If Icon is a hooked class, keep this
+
     [[NSUserDefaults standardUserDefaults] registerDefaults:@{
         EnabledKey: @YES,
     }];
+
     if (!TweakEnabled()) return;
+
     PiPIconPath = [tweakBundle pathForResource:@"yt-pip-overlay" ofType:@"png"];
     initYTVideoOverlay(TweakName, @{
         AccessibilityLabelKey: @"PiP",
         SelectorKey: @"didPressPiP:",
         ToggleKey: PiPActivationMethodKey
     });
-    %init;
+
+    %init;  // Only one %init should be used
 }
